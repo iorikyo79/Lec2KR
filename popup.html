@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeepL.AI Translator</title>
+  <link rel="stylesheet" href="styles/popup.css">
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>DeepL.AI Translator</h1>
+      <div class="status-indicator" id="statusIndicator">Ready</div>
+    </header>
+
+    <main>
+      <div class="input-group">
+        <label for="apiKey">Gemini API Key</label>
+        <input type="password" id="apiKey" placeholder="Enter your API Key">
+      </div>
+
+      <div class="input-group">
+        <label for="speedMode">Translation Speed</label>
+        <select id="speedMode">
+          <option value="stable">Stable (Sequential)</option>
+          <option value="fast">Fast (Parallel)</option>
+        </select>
+      </div>
+
+      <div class="button-group">
+        <button id="saveBtn">Save Settings</button>
+        <button id="testBtn">Test Connection</button>
+      </div>
+
+      <div class="toggle-group">
+        <span>Translation</span>
+        <label class="switch">
+          <input type="checkbox" id="toggleTranslation">
+          <span class="slider round"></span>
+        </label>
+      </div>
+    </main>
+
+    <footer>
+      <p id="message" class="message"></p>
+    </footer>
+  </div>
+  <script src="popup.js"></script>
+</body>
+
+</html>
