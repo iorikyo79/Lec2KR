@@ -1,47 +1,47 @@
 # Lec2KR (Lecture to Korean) 🎓🇰🇷
 
-**Lec2KR** is a Chrome Extension that provides real-time, context-aware Korean translations for English technical lectures on platforms like **DeepLearning.AI** and **Coursera**.
+**Lec2KR**은 **DeepLearning.AI** 및 **Coursera**와 같은 플랫폼의 영어 기술 강의를 위해 실시간, 문맥 인식 한국어 번역을 제공하는 Chrome 확장 프로그램입니다.
 
-Powered by **Google Gemini API** (Gemini 2.0 Flash Lite), it ensures natural translations for technical content by considering the surrounding context of the transcript.
+**Google Gemini API** (Gemini 2.0 Flash Lite)를 기반으로 하며, 자막의 전후 문맥을 고려하여 기술 콘텐츠에 대한 자연스러운 번역을 보장합니다.
 
-## ✨ Key Features
+## ✨ 주요 기능
 
-*   **Real-time Translation**: Displays Korean subtitles overlaid on the video player.
-*   **Context-Aware**: Translates based on previous and future sentences to maintain flow and handle technical terms correctly.
-*   **Full Transcript Translation**: Automatically translates the entire lecture transcript in the background for seamless playback.
-*   **Export Support**:
-    *   **Export EN**: Download the original English transcript.
-    *   **Export KR**: Download the fully translated Korean transcript.
-*   **Speed Modes**:
-    *   **Stable**: Sequential processing for maximum reliability.
-    *   **Fast**: Parallel processing for rapid translation (Recommended).
-*   **Draggable UI**: Position the subtitle overlay anywhere on the screen.
+*   **실시간 번역**: 비디오 플레이어 위에 한국어 자막을 오버레이로 표시합니다.
+*   **문맥 인식**: 흐름을 유지하고 기술 용어를 올바르게 처리하기 위해 이전 및 다음 문장을 기반으로 번역합니다.
+*   **전체 스크립트 번역**: 원활한 재생을 위해 백그라운드에서 전체 강의 스크립트를 자동으로 번역합니다.
+*   **내보내기 지원**:
+    *   **Export EN**: 원본 영어 스크립트 다운로드.
+    *   **Export KR**: 완전히 번역된 한국어 스크립트 다운로드.
+*   **속도 모드**:
+    *   **Stable**: 최대 안정성을 위한 순차 처리.
+    *   **Fast**: 빠른 번역을 위한 병렬 처리 (권장).
+*   **드래그 가능한 UI**: 자막 오버레이를 화면 어디에나 배치할 수 있습니다.
 
-## 🚀 Installation
+## 🚀 설치 방법
 
-1.  Clone or download this repository.
-2.  Open Chrome and navigate to `chrome://extensions/`.
-3.  Enable **Developer mode** (top right toggle).
-4.  Click **Load unpacked**.
-5.  Select the `Lec2KR` folder.
+1.  이 저장소를 복제하거나 다운로드합니다.
+2.  Chrome을 열고 `chrome://extensions/`로 이동합니다.
+3.  **개발자 모드**를 활성화합니다 (우측 상단 토글).
+4.  **압축해제된 확장 프로그램을 로드합니다**를 클릭합니다.
+5.  `Lec2KR` 폴더를 선택합니다.
 
-## 🛠 Usage
+## 🛠 사용 방법
 
-1.  Click the extension icon in the Chrome toolbar.
-2.  Enter your **Gemini API Key** (Get one from [Google AI Studio](https://aistudio.google.com/)).
-3.  Select your preferred **Translation Speed** (Fast recommended).
-4.  Click **Save Settings**.
-5.  Navigate to a lecture on DeepLearning.AI or Coursera.
-6.  The overlay will appear automatically.
-    *   **Status**: Shows translation progress (e.g., "Translating... 45%").
-    *   **Export**: Use the `EN` / `KR` buttons in the overlay header to download scripts.
+1.  Chrome 툴바에서 확장 프로그램 아이콘을 클릭합니다.
+2.  **Gemini API Key**를 입력합니다 ([Google AI Studio](https://aistudio.google.com/)에서 발급 가능).
+3.  선호하는 **번역 속도(Translation Speed)**를 선택합니다 (Fast 권장).
+4.  **Save Settings**를 클릭합니다.
+5.  DeepLearning.AI 또는 Coursera의 강의로 이동합니다.
+6.  오버레이가 자동으로 나타납니다.
+    *   **상태**: 번역 진행 상황을 표시합니다 (예: "Translating... 45%").
+    *   **내보내기**: 오버레이 헤더의 `EN` / `KR` 버튼을 사용하여 스크립트를 다운로드합니다.
 
-## 🔧 Technology Stack
+## 🔧 기술 스택
 
-*   **Manifest V3**: Modern Chrome Extension architecture.
-*   **Google Gemini API**: Uses `gemini-2.0-flash-lite` for high-speed, cost-effective translation.
-*   **Vanilla JS**: Lightweight implementation without heavy frameworks.
+*   **Manifest V3**: 최신 Chrome 확장 프로그램 아키텍처.
+*   **Google Gemini API**: 고속, 비용 효율적인 번역을 위해 `gemini-2.0-flash-lite` 사용.
+*   **Vanilla JS**: 무거운 프레임워크 없는 경량 구현.
 
-## 📝 License
+## 📝 라이선스
 
 MIT License
