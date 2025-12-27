@@ -28,7 +28,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     // Relay messages from Extractor to UI Injector (in the same tab)
-    if (request.action === 'SHOW_SUBTITLE' || request.action === 'STATUS_UPDATE') {
+    if (request.action === 'SHOW_SUBTITLE' || request.action === 'STATUS_UPDATE' || request.action === 'IMPORT_TRANSLATION') {
         if (sender.tab) {
             chrome.tabs.sendMessage(sender.tab.id, request);
         }
@@ -65,6 +65,15 @@ async function testConnection(apiKey) {
     }
 }
 
+async function generateContentId(captions) {
+    const text = captions.map(c => c.text).join(''); // Create signature from full text
+    const encoder = new TextEncoder();
+    const data = encoder.encode(text);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+}
+
 async function handleBatchTranslation(captions, tabId) {
     console.log('Starting batch translation for', captions.length, 'lines.');
 
@@ -74,15 +83,41 @@ async function handleBatchTranslation(captions, tabId) {
         return;
     }
 
-    const isFastMode = storage.speedMode === 'fast';
-    console.log(`Mode: ${isFastMode ? 'FAST (Parallel)' : 'STABLE (Sequential)'}`);
-
     try {
+        // 1. Generate Content ID
+        const contentId = await generateContentId(captions);
+        console.log('Content ID:', contentId);
+
+        // 2. Check Cache
+        const cacheKey = `lecture_${contentId}`;
+        const cachedData = await chrome.storage.local.get(cacheKey);
+
+        if (cachedData[cacheKey]) {
+            console.log('Cache Hit! Serving from storage.');
+            chrome.tabs.sendMessage(tabId, {
+                action: 'STATUS_UPDATE',
+                status: 'Loaded from Cache (Saved API Tokens!)'
+            });
+
+            // Brief delay to let user see the message
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            chrome.tabs.sendMessage(tabId, {
+                action: 'FULL_TRANSLATION_COMPLETE',
+                data: cachedData[cacheKey].captions
+            });
+
+            chrome.tabs.sendMessage(tabId, { action: 'STATUS_UPDATE', status: 'READY (Cached)' });
+            return;
+        }
+
+        // 3. Not Cached -> Proceed with Translation
+        const isFastMode = storage.speedMode === 'fast';
+        console.log(`Mode: ${isFastMode ? 'FAST (Parallel)' : 'STABLE (Sequential)'}`);
+
         // Configuration based on mode
-        // Fast Mode: Chunk 50 (Safe), Concurrency 5 (Fast), Delay 200ms
-        // Stable Mode: Chunk 50 (Safe), Concurrency 1 (Sequential), Delay 1000ms
-        const CHUNK_SIZE = 50; // Reduced from 150 to prevent output truncation
-        const CONCURRENCY = isFastMode ? 5 : 1; // Increased concurrency to compensate for smaller chunks
+        const CHUNK_SIZE = 50;
+        const CONCURRENCY = isFastMode ? 5 : 1;
         const DELAY_MS = isFastMode ? 200 : 1000;
 
         let translatedCaptions = [];
@@ -98,37 +133,100 @@ async function handleBatchTranslation(captions, tabId) {
 
         let completedChunks = 0;
 
-        // Helper to process a single chunk
+        // ... (Define processChunk inside or outside, assuming it uses closure for now if not moved)
+        // Note: processChunk relies on callGeminiSimple which is outside.
+        // Re-defining processChunk here to capture scope if needed, or if it was inline.
+        const formatTime = (seconds) => {
+            const date = new Date(seconds * 1000);
+            const hh = String(date.getUTCHours()).padStart(2, '0');
+            const mm = String(date.getUTCMinutes()).padStart(2, '0');
+            const ss = String(date.getUTCSeconds()).padStart(2, '0');
+            return `${hh}:${mm}:${ss}`;
+        };
+
         const processChunk = async (chunk) => {
-            const textChunk = chunk.data.map(c => c.text).join('\n');
+            // 1. Prepare Input JSON
+            const inputJson = chunk.data.map((c) => ({
+                id: formatTime(c.startInSeconds),
+                text: c.text
+            }));
+
             const prompt = `
-당신은 영어 자막을 한글 자막으로 변환하는 최고의 번역가 입니다.
-자막을 번역할 때는 앞뒤 맥락을 고려하여 가장 자연스러운 표현을 사용합니다.
-또한 전문 용어나 약자는 영어로 표기해.
-입력된 텍스트의 줄바꿈(Line structure)을 그대로 유지하고 영어 자막 내용만 한국어로 변환해야해.
-내용을 요약하거나 정리하려고 하지마.
-마크다운 포맷(\`\`\`)이나 부가적인 설명, 입력 텍스트는 포함하지 말고 오직 번역된 텍스트만 출력해.
+당신은 전문 자막 번역가입니다. 제공된 영어 자막(JSON)을 한국어 자막(JSON)으로 번역하세요.
+다음 4가지 [동기화 절대 원칙]을 반드시 준수해야 합니다.
+
+[동기화 절대 원칙]
+1. **타임스탬프 개수 일치 (1:1 Mapping)**:
+   - 입력된 원문 리스트의 개수와 출력된 번역 리스트의 개수는 **정확히 일치**해야 합니다. (입력 크기 == 출력 크기)
+   - 절대 리스트 항목을 추가하거나 삭제하지 마세요.
+
+2. **문맥 기반 번역 (Context-Aware Translation)**:
+   - 각 타임스탬프의 텍스트를 독립적으로 보지 말고, 앞뒤 문맥을 연결하여 자연스러운 문장으로 번역하세요.
+   - 문장이 끊겨 있더라도 전체 의미를 파악한 뒤 한국어 어순에 맞게 적절히 배치하세요.
+
+3. **문장 구조 동기화 (Structure Sync)**:
+   - 원문의 문장 개수와 번역문의 문장 개수는 동일해야 합니다.
+   - 영어 문장이 3개의 타임스탬프에 걸쳐 있다면, 한국어 문장도 반드시 동일한 3개의 타임스탬프에 걸쳐 있어야 합니다.
+
+4. **비율 유지 분할 (Proportional Split)**:
+   - 원문에서 하나의 문장이 두 타임스탬프에 [AAA... / BBB...] 형태로 나뉘어 있다면, 
+   - 번역문도 [가가가... / 나나나...] 형태로 동일한 비율로 나누어야 합니다.
+   - **절대** 한쪽 타임스탬프에 내용을 몰아넣지 마세요. 시각적/시간적 길이를 원문과 비슷하게 유지하세요.
+
+Input Format:
+[
+  {"id": "00:00:02", "text": "Welcome to this course..."},
+  ...
+]
+
+Output Format (JSON Only):
+[
+  {"id": "00:00:02", "text": "이 과정에 오신 것을 환영합니다..."},
+  ...
+]
 
 Input:
-"""
-${textChunk}
-"""
-Output (Korean translation, line by line):
+\`\`\`json
+${JSON.stringify(inputJson, null, 2)}
+\`\`\`
 `;
 
             try {
                 const result = await callGeminiSimple(storage.geminiApiKey, prompt);
+                console.log(`Chunk ${chunk.index} Result:\n`, result);
 
-                // Cleanup
-                let cleanResult = result.replace(/```korean/g, '').replace(/```/g, '').replace(/"""/g, '');
-                const resultLines = cleanResult.split('\n').filter(l => l.trim() !== '');
+                // 2. Parse JSON Response
+                let jsonStr = result;
+                // Try to find JSON block
+                const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/) || result.match(/```\s*([\s\S]*?)\s*```/);
+                if (jsonMatch) {
+                    jsonStr = jsonMatch[1];
+                }
 
-                // Map back
+                // Heuristic cleanup: find first '[' and last ']'
+                const start = jsonStr.indexOf('[');
+                const end = jsonStr.lastIndexOf(']');
+                if (start !== -1 && end !== -1) {
+                    jsonStr = jsonStr.substring(start, end + 1);
+                }
+
+                let parsed = [];
+                try {
+                    parsed = JSON.parse(jsonStr);
+                } catch (e) {
+                    console.error('JSON Parse Error:', e);
+                    // Fallback to original text is handled by the map below (undefined checks)
+                }
+
+                // 3. Map back to internal structure
                 const mapped = chunk.data.map((c, idx) => {
-                    let translatedText = resultLines[idx] ? resultLines[idx].trim() : c.text;
-                    if (translatedText.startsWith('Input:') || translatedText.startsWith('Output:')) {
-                        translatedText = c.text;
+                    let translatedText = c.text; // Default to original
+
+                    // Use index-based mapping as per "1:1 mapping" rule
+                    if (parsed && Array.isArray(parsed) && parsed[idx] && parsed[idx].text) {
+                        translatedText = parsed[idx].text;
                     }
+
                     return {
                         startInSeconds: c.startInSeconds,
                         endInSeconds: c.endInSeconds,
@@ -140,17 +238,14 @@ Output (Korean translation, line by line):
 
             } catch (error) {
                 console.error('Chunk failed:', error);
-                // Fallback to original
                 return { index: chunk.index, data: chunk.data };
             }
         };
 
-        // Process chunks with concurrency control
         const results = [];
         for (let i = 0; i < chunks.length; i += CONCURRENCY) {
             const batch = chunks.slice(i, i + CONCURRENCY);
 
-            // Notify progress
             const progressPercent = Math.round((completedChunks / chunks.length) * 100);
             chrome.tabs.sendMessage(tabId, {
                 action: 'STATUS_UPDATE',
@@ -162,20 +257,36 @@ Output (Korean translation, line by line):
 
             completedChunks += batch.length;
 
-            // Delay between batches
             if (i + CONCURRENCY < chunks.length) {
                 await new Promise(resolve => setTimeout(resolve, DELAY_MS));
             }
         }
 
-        // Sort results by index to ensure order (Promise.all maintains order of batch, but we pushed batches)
-        // Actually results array order depends on push order which is sequential by batch.
-        // But inside batch, Promise.all returns in order. So flat map should be fine.
-        // Let's just sort to be safe if we change logic later.
         results.sort((a, b) => a.index - b.index);
-
-        // Flatten
         translatedCaptions = results.flatMap(r => r.data);
+
+        // 4. Save to Cache & Download
+        const saveObj = {
+            [cacheKey]: {
+                captions: translatedCaptions,
+                timestamp: Date.now()
+            }
+        };
+        await chrome.storage.local.set(saveObj);
+        console.log('Saved to cache:', cacheKey);
+
+        // Trigger Download
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(translatedCaptions, null, 2));
+        const filename = `lecture_${contentId}_kr.json`;
+
+        // Use downloads API to save to local folder
+        chrome.downloads.download({
+            url: dataStr,
+            filename: filename,
+            saveAs: false // Auto-save without prompt
+        }, (downloadId) => {
+            console.log('Download triggered:', downloadId);
+        });
 
         // Send complete data back
         chrome.tabs.sendMessage(tabId, {
@@ -183,7 +294,7 @@ Output (Korean translation, line by line):
             data: translatedCaptions
         });
 
-        chrome.tabs.sendMessage(tabId, { action: 'STATUS_UPDATE', status: 'READY' });
+        chrome.tabs.sendMessage(tabId, { action: 'STATUS_UPDATE', status: 'READY (Saved)' });
 
     } catch (error) {
         console.error('Batch translation failed:', error);

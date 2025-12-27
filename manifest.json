@@ -6,7 +6,9 @@
     "permissions": [
         "activeTab",
         "scripting",
-        "storage"
+        "storage",
+        "unlimitedStorage",
+        "downloads"
     ],
     "host_permissions": [
         "https://*.deeplearning.ai/*",

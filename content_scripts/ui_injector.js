@@ -62,6 +62,22 @@ class SubtitleOverlay {
         exportKrBtn.onclick = () => this.requestExport('KR');
         controls.appendChild(exportKrBtn);
 
+        // Import Button
+        const importBtn = document.createElement('button');
+        importBtn.innerText = 'Import';
+        importBtn.className = 'deepl-btn';
+        importBtn.title = 'Import Translated JSON';
+        importBtn.onclick = () => this.triggerImport();
+        controls.appendChild(importBtn);
+
+        // Hidden File Input
+        this.fileInput = document.createElement('input');
+        this.fileInput.type = 'file';
+        this.fileInput.accept = '.json';
+        this.fileInput.style.display = 'none';
+        this.fileInput.onchange = (e) => this.handleFileSelect(e);
+        controls.appendChild(this.fileInput);
+
         header.appendChild(controls);
         this.overlay.appendChild(header);
 
@@ -148,6 +164,38 @@ class SubtitleOverlay {
         if (this.overlay) {
             this.overlay.style.display = enabled ? 'block' : 'none';
         }
+    }
+
+    triggerImport() {
+        this.fileInput.click();
+    }
+
+    handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const json = JSON.parse(e.target.result);
+                // Validate minimal structure
+                if (Array.isArray(json)) {
+                    chrome.runtime.sendMessage({
+                        action: 'IMPORT_TRANSLATION',
+                        data: json
+                    });
+                    this.updateStatus('Imported!');
+                } else {
+                    alert('Invalid JSON format. The file must be an array of subtitles (e.g., [{"startInSeconds": 0, "text": "..."}]).');
+                }
+            } catch (err) {
+                console.error('Import failed', err);
+                alert('Failed to parse JSON file. Please ensure it is a valid JSON.');
+            }
+        };
+        reader.readAsText(file);
+        // Reset value to allow re-importing same file
+        event.target.value = '';
     }
 
     makeDraggable() {

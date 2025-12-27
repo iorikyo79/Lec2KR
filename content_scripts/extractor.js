@@ -228,6 +228,65 @@ class TranscriptExtractor {
     // Export Logic
     // ==========================================
 
+    handleImport(data) {
+        console.log('Imported translation received!', data);
+        if (Array.isArray(data) && data.length > 0) {
+            // Normalize data
+            const normalized = data.map((item, index) => {
+                let start = item.startInSeconds;
+                const text = item.text;
+
+                // Handle "id": "00:00:00" format
+                if (start === undefined && typeof item.id === 'string') {
+                    const parts = item.id.split(':').map(Number);
+                    if (parts.length === 3) {
+                        start = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                    } else if (parts.length === 2) {
+                        start = parts[0] * 60 + parts[1];
+                    }
+                }
+
+                return { startInSeconds: start, text: text, original: item };
+            });
+
+            // Filter valid items
+            const validItems = normalized.filter(item => typeof item.startInSeconds === 'number' && item.text);
+
+            if (validItems.length > 0) {
+                // Calculate endInSeconds if missing
+                this.translatedCaptionsData = validItems.map((item, i) => {
+                    let end = item.original.endInSeconds;
+                    if (end === undefined) {
+                        // Use next item's start or default duration (e.g. 5s)
+                        const nextItem = validItems[i + 1];
+                        if (nextItem) {
+                            end = nextItem.startInSeconds;
+                        } else {
+                            // Last item: typical duration
+                            end = item.startInSeconds + 5;
+                        }
+                    }
+                    return {
+                        startInSeconds: item.startInSeconds,
+                        endInSeconds: end,
+                        text: item.text
+                    };
+                });
+
+                console.log('Imported and normalized:', this.translatedCaptionsData);
+                chrome.runtime.sendMessage({ action: 'STATUS_UPDATE', status: 'READY (Imported)' });
+            } else {
+                console.error('Invalid JSON structure. Could not find timestamps.');
+                chrome.runtime.sendMessage({
+                    action: 'TRANSLATION_ERROR',
+                    error: 'Invalid Format: timestamps/text missing'
+                });
+            }
+        } else {
+            chrome.runtime.sendMessage({ action: 'TRANSLATION_ERROR', error: 'Invalid Format or Empty Array' });
+        }
+    }
+
     setupExportListener() {
         chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if (request.action === 'REQUEST_EXPORT') {
@@ -240,10 +299,9 @@ class TranscriptExtractor {
             if (request.action === 'FULL_TRANSLATION_COMPLETE') {
                 console.log('Full translation received!', request.data);
                 this.translatedCaptionsData = request.data;
-                // Also trigger download if this was from an export request? 
-                // The user said "Export KR" should use this too.
-                // But for now, let's just save it for display.
-                // If the user clicks Export KR *after* this is done, we should use this data.
+            }
+            if (request.action === 'IMPORT_TRANSLATION') {
+                this.handleImport(request.data);
             }
         });
     }

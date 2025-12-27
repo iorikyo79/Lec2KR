@@ -4,8 +4,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const saveBtn = document.getElementById('saveBtn');
     const testBtn = document.getElementById('testBtn');
     const toggleTranslation = document.getElementById('toggleTranslation');
-    const statusDiv = document.getElementById('status'); // Changed from messageEl
-    const statusIndicator = document.getElementById('statusIndicator'); // Kept from original
+    const messageEl = document.getElementById('message');
+    const statusIndicator = document.getElementById('statusIndicator');
 
     // Load saved settings
     const data = await chrome.storage.local.get(['geminiApiKey', 'translationEnabled', 'speedMode']);
@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const speedMode = speedModeSelect.value;
 
         if (!apiKey) {
-            showStatus('Please enter an API Key', 'error');
+            showMessage('Please enter an API Key', 'error');
             return;
         }
 
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             speedMode: speedMode
         });
 
-        showStatus('Settings saved!', 'success');
+        showMessage('Settings saved!', 'success');
 
         // Notify active tab to reload settings if needed? 
         // Actually background.js reads from storage on every request, so it's fine.
