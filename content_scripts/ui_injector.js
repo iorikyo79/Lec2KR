@@ -15,6 +15,7 @@ class SubtitleOverlay {
         this.createOverlay();
         this.setupMessageListener();
         this.makeDraggable();
+        this.makeResizable();
     }
 
     createOverlay() {
@@ -69,6 +70,11 @@ class SubtitleOverlay {
         this.textElement.className = 'deepl-overlay-text';
         this.textElement.innerText = 'Waiting for subtitles...';
         this.overlay.appendChild(this.textElement);
+
+        // Resize Handle
+        const resizeHandle = document.createElement('div');
+        resizeHandle.className = 'deepl-resize-handle';
+        this.overlay.appendChild(resizeHandle);
 
         document.body.appendChild(this.overlay);
     }
@@ -155,6 +161,23 @@ class SubtitleOverlay {
         function dragMouseDown(e) {
             e = e || window.event;
             e.preventDefault();
+
+            // Fix for position jumping when transform is present
+            // Convert to absolute positioning on first drag
+            const rect = elmnt.getBoundingClientRect();
+
+            // Only if not already absolute/fixed with top/left set manually (simple check)
+            // But to be safe, we force it.
+            // We need to remove the transform and set explicit top/left
+            if (elmnt.style.transform !== 'none') {
+                elmnt.style.left = rect.left + 'px';
+                elmnt.style.top = rect.top + 'px';
+                elmnt.style.bottom = 'auto'; // Remove bottom constraint
+                elmnt.style.right = 'auto';
+                elmnt.style.transform = 'none';
+                elmnt.style.margin = '0'; // Clear margins that might affect position
+            }
+
             // get the mouse cursor position at startup:
             pos3 = e.clientX;
             pos4 = e.clientY;
@@ -180,6 +203,59 @@ class SubtitleOverlay {
             // stop moving when mouse button is released:
             document.onmouseup = null;
             document.onmousemove = null;
+        }
+    }
+
+    makeResizable() {
+        const elmnt = this.overlay;
+        const resizer = elmnt.querySelector('.deepl-resize-handle');
+        if (!resizer) return;
+
+        let startX, startY, startWidth, startHeight;
+
+        resizer.addEventListener('mousedown', initResize, false);
+
+        function initResize(e) {
+            e.preventDefault();
+            // Stop propagation so it doesn't trigger drag
+            e.stopPropagation();
+
+            startX = e.clientX;
+            startY = e.clientY;
+
+            const rect = elmnt.getBoundingClientRect();
+            startWidth = rect.width;
+            startHeight = rect.height;
+
+            // Ensure absolute positioning is locked in (similar to drag fix)
+            if (elmnt.style.transform !== 'none') {
+                elmnt.style.left = rect.left + 'px';
+                elmnt.style.top = rect.top + 'px';
+                elmnt.style.bottom = 'auto';
+                elmnt.style.right = 'auto';
+                elmnt.style.transform = 'none';
+                elmnt.style.margin = '0';
+            }
+
+            window.addEventListener('mousemove', resize, false);
+            window.addEventListener('mouseup', stopResize, false);
+        }
+
+        function resize(e) {
+            const width = startWidth + (e.clientX - startX);
+            const height = startHeight + (e.clientY - startY);
+
+            // Minimum dimensions are handled by CSS (min-width/min-height)
+            // but setting style width/height will override unless we respect them.
+            // But CSS min-width/height usually win over style width/height if smaller.
+            // Let's just set them.
+            elmnt.style.width = width + 'px';
+            elmnt.style.height = height + 'px';
+        }
+
+        function stopResize(e) {
+            window.removeEventListener('mousemove', resize, false);
+            window.removeEventListener('mouseup', stopResize, false);
         }
     }
 }
