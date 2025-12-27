@@ -15,7 +15,9 @@ class TranscriptExtractor {
         // Strategy: 'DOM' or 'DATA'
         this.strategy = 'DOM';
         this.captionsData = null; // For DATA strategy
+        this.translatedCaptionsData = null; // Store translated data
         this.videoElement = null; // For DATA strategy
+        this.observer = null; // For DOM strategy
 
         this.SELECTORS = {
             TRANSCRIPT_CONTAINER: '.rc-Transcript',
@@ -43,6 +45,35 @@ class TranscriptExtractor {
         // Fallback to DOM Strategy
         console.log('DeepL.AI Extractor: Using DOM Strategy.');
         this.startObserving();
+    }
+
+    reset() {
+        console.log('DeepL.AI Extractor: Resetting...');
+
+        // Clear state
+        this.currentSentence = '';
+        this.captionsData = null;
+        this.translatedCaptionsData = null;
+
+        // Stop Observer
+        if (this.observer) {
+            this.observer.disconnect();
+            this.observer = null;
+        }
+
+        // Remove video listener
+        if (this.videoElement) {
+            // We need a reference to the bound function to remove it,
+            // but we used an arrow function in initDataStrategy.
+            // However, simply nulling videoElement will stop handleTimeUpdate from doing anything.
+            // For a cleaner cleanup, we should store the bound function.
+            // For now, let's just clear the reference, initDataStrategy will re-attach to the new video element.
+            this.videoElement = null;
+        }
+
+        // Re-initialize
+        // Add a small delay to allow the page to fully update its DOM/Data
+        setTimeout(() => this.init(), 1000);
     }
 
     // ==========================================
@@ -240,10 +271,17 @@ class TranscriptExtractor {
             if (request.action === 'FULL_TRANSLATION_COMPLETE') {
                 console.log('Full translation received!', request.data);
                 this.translatedCaptionsData = request.data;
-                // Also trigger download if this was from an export request? 
-                // The user said "Export KR" should use this too.
-                // But for now, let's just save it for display.
-                // If the user clicks Export KR *after* this is done, we should use this data.
+            }
+            // Handling page updates and manual refreshes
+            if (request.action === 'PAGE_UPDATED') {
+                console.log('Page update detected, resetting extractor...');
+                chrome.runtime.sendMessage({ action: 'STATUS_UPDATE', status: 'Reloading...' });
+                this.reset();
+            }
+            if (request.action === 'MANUAL_REFRESH') {
+                console.log('Manual refresh requested, resetting extractor...');
+                chrome.runtime.sendMessage({ action: 'STATUS_UPDATE', status: 'Reloading...' });
+                this.reset();
             }
         });
     }

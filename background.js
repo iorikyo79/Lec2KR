@@ -28,12 +28,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     // Relay messages from Extractor to UI Injector (in the same tab)
-    if (request.action === 'SHOW_SUBTITLE' || request.action === 'STATUS_UPDATE') {
+    if (request.action === 'SHOW_SUBTITLE' || request.action === 'STATUS_UPDATE' || request.action === 'MANUAL_REFRESH') {
         if (sender.tab) {
             chrome.tabs.sendMessage(sender.tab.id, request);
         }
     }
 });
+
+// Detect URL changes (SPA navigation)
+chrome.webNavigation.onHistoryStateUpdated.addListener(
+    function(details) {
+        if (details.frameId === 0) { // Top-level frame only
+            console.log('Navigation detected:', details.url);
+            chrome.tabs.sendMessage(details.tabId, {
+                action: 'PAGE_UPDATED',
+                url: details.url
+            });
+        }
+    },
+    {
+        url: [
+            { hostContains: 'deeplearning.ai' },
+            { hostContains: 'coursera.org' }
+        ]
+    }
+);
 
 async function testConnection(apiKey) {
     // Use generateContent for testing to ensure we can actually use the model

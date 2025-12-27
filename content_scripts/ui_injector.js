@@ -62,6 +62,14 @@ class SubtitleOverlay {
         exportKrBtn.onclick = () => this.requestExport('KR');
         controls.appendChild(exportKrBtn);
 
+        // Refresh Button
+        const refreshBtn = document.createElement('button');
+        refreshBtn.innerText = '↻';
+        refreshBtn.className = 'deepl-btn';
+        refreshBtn.title = 'Manual Refresh';
+        refreshBtn.onclick = () => this.requestRefresh();
+        controls.appendChild(refreshBtn);
+
         header.appendChild(controls);
         this.overlay.appendChild(header);
 
@@ -86,6 +94,34 @@ class SubtitleOverlay {
         chrome.runtime.sendMessage({
             action: 'REQUEST_EXPORT',
             language: lang
+        });
+    }
+
+    requestRefresh() {
+        this.updateStatus('Reloading...');
+        // Send directly to extractor in the same tab, or via background if preferred.
+        // Since both scripts are in the same tab, we can use runtime.sendMessage and let background route it,
+        // OR we can send to background and background sends back to tab?
+        // Actually, content scripts can't send messages to other content scripts directly easily without background.
+        // So we send to background, and background forwards to tab (already implemented for general relay).
+        // BUT, we can also just listen in extractor for this message if we send it via runtime.
+
+        // Let's send to background to relay, or directly to extractor if it listens to runtime.onMessage.
+        // Extractor listens to runtime.onMessage.
+        // However, chrome.runtime.sendMessage sends to background script usually.
+        // So we need background to relay it back to the tab.
+
+        // Let's use a specific action that background handles?
+        // Or simply rely on the fact that extractor listens to 'MANUAL_REFRESH'.
+        // But if we send from here, it goes to background. Background needs to bounce it back.
+
+        // Let's check background.js relay logic.
+        // It relays SHOW_SUBTITLE and STATUS_UPDATE.
+        // Let's add MANUAL_REFRESH relay support to background or just handle it there.
+
+        // Actually, cleaner way:
+        chrome.runtime.sendMessage({
+            action: 'MANUAL_REFRESH'
         });
     }
 
