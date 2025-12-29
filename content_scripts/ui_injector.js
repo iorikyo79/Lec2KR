@@ -46,6 +46,14 @@ class SubtitleOverlay {
         this.statusElement.innerText = 'Init...';
         controls.appendChild(this.statusElement);
 
+        // Refresh Button
+        const refreshBtn = document.createElement('button');
+        refreshBtn.innerText = '↻'; // Refresh symbol
+        refreshBtn.className = 'deepl-btn';
+        refreshBtn.title = 'Refresh Page (Reset)';
+        refreshBtn.onclick = () => window.location.reload();
+        controls.appendChild(refreshBtn);
+
         // Export EN Button
         const exportEnBtn = document.createElement('button');
         exportEnBtn.innerText = 'EN';
@@ -73,7 +81,7 @@ class SubtitleOverlay {
         // Hidden File Input
         this.fileInput = document.createElement('input');
         this.fileInput.type = 'file';
-        this.fileInput.accept = '.json';
+        this.fileInput.accept = '.json,.txt';
         this.fileInput.style.display = 'none';
         this.fileInput.onchange = (e) => this.handleFileSelect(e);
         controls.appendChild(this.fileInput);
@@ -176,26 +184,55 @@ class SubtitleOverlay {
 
         const reader = new FileReader();
         reader.onload = (e) => {
+            const content = e.target.result;
+            let data = null;
+
             try {
-                const json = JSON.parse(e.target.result);
-                // Validate minimal structure
-                if (Array.isArray(json)) {
+                if (file.name.toLowerCase().endsWith('.json')) {
+                    data = JSON.parse(content);
+                } else {
+                    // Treat as TXT
+                    data = this.parseTxtImport(content);
+                }
+
+                if (Array.isArray(data) && data.length > 0) {
                     chrome.runtime.sendMessage({
                         action: 'IMPORT_TRANSLATION',
-                        data: json
+                        data: data
                     });
                     this.updateStatus('Imported!');
                 } else {
-                    alert('Invalid JSON format. The file must be an array of subtitles (e.g., [{"startInSeconds": 0, "text": "..."}]).');
+                    alert('Invalid format. For TXT, use "[HH:MM:SS] Text". For JSON, ensure it is an array.');
                 }
             } catch (err) {
                 console.error('Import failed', err);
-                alert('Failed to parse JSON file. Please ensure it is a valid JSON.');
+                alert('Failed to parse file: ' + err.message);
             }
         };
         reader.readAsText(file);
         // Reset value to allow re-importing same file
         event.target.value = '';
+    }
+
+    parseTxtImport(text) {
+        const lines = text.split(/\r?\n/);
+        const data = [];
+        // Match: [00:00:15] Hello world
+        const regex = /^\[(\d{1,2}:\d{2}:\d{2})\]\s*(.*)$/;
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+
+            const match = trimmed.match(regex);
+            if (match) {
+                data.push({
+                    id: match[1],
+                    text: match[2].trim()
+                });
+            }
+        }
+        return data;
     }
 
     makeDraggable() {
